@@ -49,7 +49,7 @@ final class Poly {
     static Poly d6() {
         List<float[]> p = new ArrayList<>();
         for (int i = 0; i < 8; i++) p.add(new float[]{(i & 1) * 2 - 1, (i >> 1 & 1) * 2 - 1, (i >> 2 & 1) * 2 - 1});
-        return new Poly(6, p.toArray(new float[0][]), 1.25f).numbered(null);
+        return new Poly(6, p.toArray(new float[0][]), 1.1f).numbered(null);
     }
 
     static Poly d8() {
@@ -68,7 +68,7 @@ final class Poly {
             p[2 + k] = new float[]{(float) Math.cos(a1), (float) z, (float) Math.sin(a1)};
             p[7 + k] = new float[]{(float) Math.cos(a2), (float) -z, (float) Math.sin(a2)};
         }
-        Poly d = new Poly(10, p, labels == null ? 1.0f : 1.05f);
+        Poly d = new Poly(10, p, 0.82f);
         return d.numbered(labels);
     }
 
@@ -83,7 +83,7 @@ final class Poly {
                 p.add(new float[]{(float) (s1 * f), 0, (float) (s2 * g)});
             }
         }
-        return new Poly(12, p.toArray(new float[0][]), 1.1f).numbered(null);
+        return new Poly(12, p.toArray(new float[0][]), 0.8f).numbered(null);
     }
 
     static Poly d20() {

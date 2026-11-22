@@ -458,7 +458,7 @@ final class Sfx {
     static short[] finish(float[] b, float gain) {
         float peak = 1e-6f;
         for (float v : b) peak = Math.max(peak, Math.abs(v));
-        float norm = Math.min(gain, 0.98f / peak * 1.15f);
+        float norm = 0.95f / peak * Math.min(1f, gain);  // every sound peaks at the same level
         short[] out = new short[b.length];
         int fade = Math.min(b.length, SR / 50);
         for (int i = 0; i < b.length; i++) {
