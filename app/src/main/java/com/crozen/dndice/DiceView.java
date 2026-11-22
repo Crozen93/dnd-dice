@@ -506,7 +506,7 @@ final class DiceView extends View implements SensorEventListener {
         if (state == ROLLING) return;
         if (historyOpen || settingsOpen) return;
         boolean fromIdle = state == IDLE;
-        float startX = cx, startY = fromIdle ? idleY() : S * 0.40f;
+        float startX = cx, startY = fromIdle ? idleY() : S * 0.38f;
         float startSize = fromIdle ? idleSize() : S * 0.12f;
         int prevKind = idleKind();
         if (fromIdle) computeIdleQ(idleQ);
@@ -524,7 +524,7 @@ final class DiceView extends View implements SensorEventListener {
             an.poly = polys[d.kind];
             an.dropped = d.dropped;
             an.fx = cx + lay[i][0] * S;
-            an.fy = S * 0.40f + lay[i][1] * S;
+            an.fy = S * 0.38f + lay[i][1] * S;
             an.size = lay[i][2] * S;
             an.startX = startX + (i == 0 ? 0 : (rng.nextFloat() - 0.5f) * S * 0.08f);
             an.startY = startY + (i == 0 ? 0 : (rng.nextFloat() - 0.5f) * S * 0.08f);
@@ -589,7 +589,7 @@ final class DiceView extends View implements SensorEventListener {
     /** Final positions (relative to the roll centre) and circumradius, all as fractions of S. */
     private static float[][] layout(int n) {
         switch (n) {
-            case 1: return new float[][]{{0, 0, 0.235f}};
+            case 1: return new float[][]{{0, 0, 0.21f}};
             case 2: return new float[][]{{-0.19f, 0, 0.155f}, {0.19f, 0, 0.155f}};
             case 3: return new float[][]{{-0.19f, -0.085f, 0.135f}, {0.19f, -0.085f, 0.135f}, {0, 0.135f, 0.135f}};
             case 4: return new float[][]{{-0.15f, -0.125f, 0.12f}, {0.15f, -0.125f, 0.12f},
@@ -1150,7 +1150,7 @@ final class DiceView extends View implements SensorEventListener {
     }
 
     private boolean hitRollArea(float x, float y) {
-        return y < S * 0.68f && Math.hypot(x - cx, y - S * 0.40f) < S * 0.33f;
+        return y < S * 0.68f && Math.hypot(x - cx, y - S * 0.38f) < S * 0.33f;
     }
 
     private void onSwipe(float dx, float dy) {
