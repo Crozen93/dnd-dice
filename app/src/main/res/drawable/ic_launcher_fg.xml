@@ -2,9 +2,9 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFA3202C" android:pathData="M54.00,24.00 L79.98,39.00 L79.98,69.00 L54.00,84.00 L28.02,69.00 L28.02,39.00 Z"/>
-    <path android:fillColor="#FFC8303C" android:pathData="M54.00,40.50 L72.60,66.60 L35.40,66.60 Z"/>
-    <path android:strokeColor="#FFE8B95A" android:strokeWidth="1.6" android:strokeLineJoin="round" android:pathData="M54.00,24.00 L54.00,40.50 M79.98,39.00 L72.60,66.60 M79.98,69.00 L72.60,66.60 M54.00,84.00 L72.60,66.60 M54.00,84.00 L35.40,66.60 M28.02,69.00 L35.40,66.60 M28.02,39.00 L35.40,66.60 M28.02,39.00 L54.00,40.50 M79.98,39.00 L54.00,40.50"/>
-    <path android:strokeColor="#FFE8B95A" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M54.00,40.50 L72.60,66.60 L35.40,66.60 Z"/>
-    <path android:strokeColor="#FFF2CF7A" android:strokeWidth="2.8" android:strokeLineJoin="round" android:pathData="M54.00,24.00 L79.98,39.00 L79.98,69.00 L54.00,84.00 L28.02,69.00 L28.02,39.00 Z"/>
+    <path android:fillColor="#FF4B2378" android:pathData="M54.00,24.00 L79.98,39.00 L79.98,69.00 L54.00,84.00 L28.02,69.00 L28.02,39.00 Z"/>
+    <path android:fillColor="#FF8E3BB8" android:pathData="M54.00,40.50 L72.60,66.60 L35.40,66.60 Z"/>
+    <path android:strokeColor="#FFFF9BEF" android:strokeWidth="1.6" android:strokeLineJoin="round" android:pathData="M54.00,24.00 L54.00,40.50 M79.98,39.00 L72.60,66.60 M79.98,69.00 L72.60,66.60 M54.00,84.00 L72.60,66.60 M54.00,84.00 L35.40,66.60 M28.02,69.00 L35.40,66.60 M28.02,39.00 L35.40,66.60 M28.02,39.00 L54.00,40.50 M79.98,39.00 L54.00,40.50"/>
+    <path android:strokeColor="#FFFFB8F4" android:strokeWidth="2.4" android:strokeLineJoin="round" android:pathData="M54.00,40.50 L72.60,66.60 L35.40,66.60 Z"/>
+    <path android:strokeColor="#FFD6DCE6" android:strokeWidth="2.8" android:strokeLineJoin="round" android:pathData="M54.00,24.00 L79.98,39.00 L79.98,69.00 L54.00,84.00 L28.02,69.00 L28.02,39.00 Z"/>
 </vector>

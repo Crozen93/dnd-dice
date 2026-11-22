@@ -24,8 +24,10 @@ import java.util.Locale;
 import java.util.Random;
 
 /**
- * The whole app on one Canvas, styled after the Baldur's Gate 3 ability-check panel:
- * a dark arch with a gold frame and the Difficulty Class on top, a pearl d20 below.
+ * The whole app on one Canvas, themed after the ruined city of Drakkenheim: a gothic lancet
+ * window in an iron frame with a delerium crystal at its peak, the Haze drifting across the
+ * screen, and dice cut from iridescent delerium (or obsidian). The roll follows the BG3
+ * ability-check flow: Difficulty Class on top, the die below.
  *
  * A roll: the die vanishes, flies back in from off-screen and ricochets off the panel walls
  * with spark trails, lands with a thud, a golden spark carries the result to the DC, and the
@@ -60,7 +62,7 @@ final class DiceView extends View implements SensorEventListener {
 
     // ------------------------------------------------------------------ layout (fractions of S)
 
-    private static final float ARCH_L = 0.19f, ARCH_R = 0.81f, ARCH_T = 0.12f, ARCH_B = 0.835f;
+    private static final float ARCH_L = 0.19f, ARCH_R = 0.81f, ARCH_T = 0.09f, ARCH_B = 0.835f;
     private static final float HEAD_CAP_Y = 0.215f, HEAD_NUM_Y = 0.318f, DIVIDER_Y = 0.372f;
     private static final float DIE_Y = 0.468f, DIE_SIZE = 0.15f;
     private static final float BREAK_Y = 0.668f, TOTAL_Y = 0.75f, VERDICT_Y = 0.81f;
@@ -96,7 +98,7 @@ final class DiceView extends View implements SensorEventListener {
     // ------------------------------------------------------------------ particles
 
     private static final int P_MAX = 260;
-    private static final int PT_STREAK = 0, PT_GLOW = 1, PT_SMOKE = 2;
+    private static final int PT_STREAK = 0, PT_GLOW = 1, PT_SMOKE = 2, PT_MOTE = 3;
     private final float[] pX = new float[P_MAX], pY = new float[P_MAX], pVX = new float[P_MAX], pVY = new float[P_MAX],
             pLife = new float[P_MAX], pMax = new float[P_MAX], pSize = new float[P_MAX], pDrag = new float[P_MAX],
             pGrav = new float[P_MAX];
@@ -133,7 +135,7 @@ final class DiceView extends View implements SensorEventListener {
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bg = new Paint();
     private final Paint archFill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private RadialGradient glowShader, redShader;
+    private RadialGradient redShader;
     private final Path archPath = new Path(), archInner = new Path();
     private final Matrix shaderM = new Matrix();
     private final Matrix homo = new Matrix();
@@ -151,14 +153,18 @@ final class DiceView extends View implements SensorEventListener {
     private static final float[] HALF = norm(-0.38f, 0.58f, 1.72f);
 
     // palette
-    private static final int GOLD = 0xFFD9AE5C, GOLD_HI = 0xFFFFE3A0, GOLD_DIM = 0xFF6E5530,
-            IVORY = 0xFFF2EBDD, MUTED = 0xFF9A8FA8, RED = 0xFFE0404E, EMBER = 0xFFFF7A3C;
+    // accent = delerium magenta; frame = tarnished iron; text = bone and ash
+    private static final int GOLD = 0xFFE04ACB, GOLD_HI = 0xFFFFA8F2, GOLD_DIM = 0xFF3E4250,
+            IVORY = 0xFFEAE4D6, MUTED = 0xFF8E8A9C, RED = 0xFFFF3B5C, EMBER = 0xFFFF4FA0,
+            IRON = 0xFF9AA2B0, IRON_HI = 0xFFD6DCE6, CYAN = 0xFF56F0DC, CYAN_HI = 0xFFB8FFF6, VIOLET = 0xFF8A4BFF;
+    private static final int[] HAZE = {0xFFFF6AD5, 0xFFB46BFF, 0xFF56F0DC, 0xFFFFC46B, 0xFF7FA8FF};
 
-    // die styles: 0 pearl, 1 ruby, 2 crit gold
-    private static final int[][] BASE = {{178, 174, 198}, {150, 26, 40}, {236, 182, 66}};
-    private static final int[][] EDGE = {{238, 236, 248}, {232, 185, 90}, {255, 244, 200}};
-    private static final int[][] NUM = {{38, 33, 60}, {255, 226, 160}, {74, 32, 4}};
-    private static final int[] FUMBLE_NUM = {214, 32, 44};
+    // die styles: 0 delerium crystal (iridescent, base unused), 1 obsidian, 2 pure delerium (crit)
+    private static final int[][] BASE = {{150, 60, 170}, {30, 26, 38}, {178, 252, 244}};
+    private static final int[][] EDGE = {{255, 196, 248}, {126, 132, 146}, {240, 255, 255}};
+    private static final int[][] NUM = {{246, 240, 228}, {255, 130, 236}, {18, 46, 64}};
+    private static final int[] FUMBLE_NUM = {255, 52, 80};
+    private final float[] hsv = new float[3];
 
     DiceView(Context ctx, Roller roller, Sfx sfx) {
         super(ctx);
@@ -240,26 +246,31 @@ final class DiceView extends View implements SensorEventListener {
         cx = w / 2f;
         cy = h / 2f;
         bg.setShader(new RadialGradient(cx, cy * 0.9f, S * 0.66f,
-                new int[]{0xFF1E1826, 0xFF110D16, 0xFF050407}, new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
-        glowShader = new RadialGradient(0, 0, 1, new int[]{0xFFFFFFFF, 0x55FFFFFF, 0x00FFFFFF},
-                new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
-        redShader = new RadialGradient(cx, cy, S * 0.55f, new int[]{0x00000000, 0x00000000, 0xFFA00C14},
+                new int[]{0xFF15161F, 0xFF0C0C12, 0xFF040406}, new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
+        redShader = new RadialGradient(cx, cy, S * 0.55f, new int[]{0x00000000, 0x00000000, 0xFF8A0A3A},
                 new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP);
-        glow.setShader(glowShader);
 
         buildArch(archPath, 0);
         buildArch(archInner, S * 0.017f);
         archFill.setShader(new LinearGradient(0, S * ARCH_T, 0, S * ARCH_B,
-                new int[]{0xFF342A52, 0xFF221B36, 0xFF17111F}, new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+                new int[]{0xFF241E30, 0xFF16151E, 0xFF0D0D13}, new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
     }
 
+    /** Gothic lancet (drop) arch: two arcs meeting in a point, straight sides, flat sill. */
     private void buildArch(Path p, float inset) {
-        float l = S * ARCH_L + inset, r = S * ARCH_R - inset, t = S * ARCH_T + inset, b = S * ARCH_B - inset;
-        float rad = (r - l) / 2, corner = S * 0.045f;
+        float L = S * ARCH_L, Rr = S * ARCH_R, w = Rr - L, r0 = 0.75f * w;
+        float ys = S * ARCH_T + (float) Math.sqrt(r0 * r0 - (r0 - w / 2) * (r0 - w / 2));
+        float rr = r0 - inset, b = S * ARCH_B - inset, l = L + inset, r = Rr - inset, corner = S * 0.03f;
+        float lcx = L + r0, rcx = Rr - r0;
+        float aEnd = 360f - (float) Math.toDegrees(Math.acos((cx - lcx) / rr));
+        float aStart = 360f - (float) Math.toDegrees(Math.acos((cx - rcx) / rr));
         p.reset();
-        p.moveTo(l, t + rad);
-        rect.set(l, t, r, t + 2 * rad);
-        p.arcTo(rect, 180, 180, false);
+        p.moveTo(l, b - corner);
+        p.lineTo(l, ys);
+        rect.set(lcx - rr, ys - rr, lcx + rr, ys + rr);
+        p.arcTo(rect, 180, aEnd - 180, false);
+        rect.set(rcx - rr, ys - rr, rcx + rr, ys + rr);
+        p.arcTo(rect, aStart, 360 - aStart, false);
         p.lineTo(r, b - corner);
         rect.set(r - 2 * corner, b - 2 * corner, r, b);
         p.arcTo(rect, 0, 90, false);
@@ -302,7 +313,7 @@ final class DiceView extends View implements SensorEventListener {
 
         if (flashA > 0.01f) {
             fill.setShader(null);
-            fill.setColor(Color.argb((int) (flashA * 150), 255, 236, 180));
+            fill.setColor(Color.argb((int) (flashA * 150), 200, 255, 248));
             c.drawCircle(cx, cy, S * 0.75f, fill);
         }
         if (redA > 0.01f) {
@@ -327,6 +338,8 @@ final class DiceView extends View implements SensorEventListener {
         settingsA += ((settingsOpen ? 1 : 0) - settingsA) * k;
         flashA *= (float) Math.exp(-dt * 5);
         if (now >= shakeAt) redA *= (float) Math.exp(-dt * 2.2);
+
+        emitHaze(dt);
 
         if (historyOpen && !dragging) {
             histScroll += histVel * dt;
@@ -377,7 +390,7 @@ final class DiceView extends View implements SensorEventListener {
     private void drawFrame(Canvas c) {
         float spin = now * 0.04f;
         line.setStrokeWidth(S * 0.0035f);
-        line.setColor(withAlpha(GOLD_DIM, 150));
+        line.setColor(withAlpha(IRON, 90));
         c.drawCircle(cx, cy, S * 0.488f, line);
         c.save();
         c.rotate((float) Math.toDegrees(spin), cx, cy);
@@ -385,7 +398,7 @@ final class DiceView extends View implements SensorEventListener {
             float ang = (float) (i * Math.PI * 2 / 48);
             float r0 = S * (i % 4 == 0 ? 0.468f : 0.474f), r1 = S * 0.486f;
             float sn = (float) Math.sin(ang), cs = (float) Math.cos(ang);
-            line.setColor(withAlpha(i % 4 == 0 ? GOLD : GOLD_DIM, 130));
+            line.setColor(i % 4 == 0 ? withAlpha(IRON, 150) : withAlpha(GOLD_DIM, 160));
             c.drawLine(cx + cs * r0, cy + sn * r0, cx + cs * r1, cy + sn * r1, line);
         }
         c.restore();
@@ -393,28 +406,65 @@ final class DiceView extends View implements SensorEventListener {
 
     private void drawArch(Canvas c) {
         c.drawPath(archPath, archFill);
-        // soft light pooled where the die sits
-        drawGlow(c, cx, S * DIE_Y, S * 0.3f, 0xFF4A3C78, 0.55f);
-        line.setStrokeWidth(S * 0.0065f);
-        line.setColor(GOLD);
+        // the Haze pooling around the die, and a faint violet glow under the peak
+        drawGlow(c, cx, S * DIE_Y, S * 0.3f, 0xFF5A2D7A, 0.6f);
+        drawGlow(c, cx, S * 0.2f, S * 0.18f, 0xFF7A2D6E, 0.35f);
+        line.setStrokeWidth(S * 0.009f);
+        line.setColor(0xFF1E2028);
         c.drawPath(archPath, line);
-        line.setStrokeWidth(S * 0.0025f);
-        line.setColor(withAlpha(GOLD, 150));
+        line.setStrokeWidth(S * 0.005f);
+        line.setColor(IRON);
+        c.drawPath(archPath, line);
+        line.setStrokeWidth(S * 0.0022f);
+        line.setColor(withAlpha(IRON, 110));
         c.drawPath(archInner, line);
+        // iron rivets down the jambs
         fill.setShader(null);
-        fill.setColor(GOLD);
-        diamond(c, cx, S * ARCH_T, S * 0.017f);
-        fill.setColor(0xFF221B36);
-        diamond(c, cx, S * ARCH_T, S * 0.008f);
+        for (int i = 0; i < 4; i++) {
+            float y = S * (0.6f + i * 0.06f);
+            fill.setColor(IRON_HI);
+            c.drawCircle(S * ARCH_L, y, S * 0.0055f, fill);
+            c.drawCircle(S * ARCH_R, y, S * 0.0055f, fill);
+        }
+        // delerium crystal cluster crowning the peak
+        float py = S * ARCH_T;
+        float pulse = 0.75f + 0.25f * (float) Math.sin(now * 2.2f);
+        drawGlow(c, cx, py, S * 0.07f, GOLD, 0.55f * pulse);
+        crystal(c, cx, py + S * 0.004f, S * 0.012f, S * 0.05f, 0);
+        crystal(c, cx - S * 0.02f, py + S * 0.012f, S * 0.008f, S * 0.03f, -0.45f);
+        crystal(c, cx + S * 0.02f, py + S * 0.012f, S * 0.008f, S * 0.03f, 0.45f);
+        // divider under the DC with a crystal shard in the middle
         float y = S * DIVIDER_Y;
-        line.setStrokeWidth(S * 0.003f);
-        line.setColor(withAlpha(GOLD, 170));
-        c.drawLine(S * 0.25f, y, cx - S * 0.03f, y, line);
-        c.drawLine(cx + S * 0.03f, y, S * 0.75f, y, line);
-        fill.setColor(GOLD);
+        line.setStrokeWidth(S * 0.0028f);
+        line.setColor(withAlpha(IRON, 150));
+        c.drawLine(S * 0.26f, y, cx - S * 0.03f, y, line);
+        c.drawLine(cx + S * 0.03f, y, S * 0.74f, y, line);
+        drawGlow(c, cx, y, S * 0.03f, GOLD, 0.5f * pulse);
+        fill.setColor(GOLD_HI);
         diamond(c, cx, y, S * 0.013f);
-        diamond(c, S * ARCH_L, S * ARCH_B - S * 0.06f, S * 0.01f);
-        diamond(c, S * ARCH_R, S * ARCH_B - S * 0.06f, S * 0.01f);
+    }
+
+    /** A glowing delerium shard: an elongated, faceted diamond leaning by tilt (radians). */
+    private void crystal(Canvas c, float x, float baseY, float hw, float h, float tilt) {
+        c.save();
+        c.rotate((float) Math.toDegrees(tilt), x, baseY);
+        poly.reset();
+        poly.moveTo(x, baseY - h);
+        poly.lineTo(x + hw, baseY - h * 0.35f);
+        poly.lineTo(x, baseY);
+        poly.lineTo(x - hw, baseY - h * 0.35f);
+        poly.close();
+        fill.setShader(null);
+        fill.setColor(0xFFB13BC4);
+        c.drawPath(poly, fill);
+        poly.reset();
+        poly.moveTo(x, baseY - h);
+        poly.lineTo(x + hw, baseY - h * 0.35f);
+        poly.lineTo(x, baseY);
+        poly.close();
+        fill.setColor(0xFFFF8BEA);
+        c.drawPath(poly, fill);
+        c.restore();
     }
 
     private void diamond(Canvas c, float x, float y, float d) {
@@ -449,7 +499,7 @@ final class DiceView extends View implements SensorEventListener {
             if (state == RESULT && hasDc && rt >= DING_T) scale = 1 + 0.32f * (float) Math.exp(-(rt - DING_T) * 7);
             if (state == RESULT && hasDc && rt >= VERDICT_T) {
                 float m = Math.min(1, (rt - VERDICT_T) / 0.25f);
-                col = mixColor(IVORY, roller.passed(result) ? GOLD_HI : RED, m);
+                col = mixColor(IVORY, roller.passed(result) ? CYAN_HI : RED, m);
             }
         }
         serif.setTextSize(fitSize(value, size * scale, S * 0.42f, serif));
@@ -491,7 +541,7 @@ final class DiceView extends View implements SensorEventListener {
         float size = idleSize() * (0.55f + 0.45f * easeOutBack(pop)) * (0.75f + 0.25f * idleA);
         float y = idleY();
         computeIdleQ(idleQ);
-        drawGlow(c, cx, y, size * 1.8f, roller.skin == 0 ? 0xFF8C80D8 : 0xFFB0303A, 0.3f * idleA);
+        drawGlow(c, cx, y, size * 1.8f, roller.skin == 0 ? 0xFFD84AE0 : 0xFF8A3A9A, 0.32f * idleA);
         drawDie(c, polys[idleKind()], idleKind(), idleQ, cx, y, size, idleA, roller.skin, 0, -1);
         text.setTextSize(S * 0.03f);
         text.setColor(withAlpha(MUTED, (int) (idleA * 230)));
@@ -548,7 +598,7 @@ final class DiceView extends View implements SensorEventListener {
     private void drawPill(Canvas c, float x, float y, float w, float h, boolean on, String value, float size, int a) {
         rect.set(x - w / 2, y - h / 2, x + w / 2, y + h / 2);
         fill.setShader(null);
-        fill.setColor(withAlpha(on ? 0xFF2E2547 : 0xFF17121F, (int) (a * 0.95f)));
+        fill.setColor(withAlpha(on ? 0xFF2B1D33 : 0xFF14141B, (int) (a * 0.95f)));
         c.drawRoundRect(rect, h / 2, h / 2, fill);
         line.setStrokeWidth(S * (on ? 0.006f : 0.0035f));
         line.setColor(withAlpha(on ? GOLD : GOLD_DIM, a));
@@ -561,7 +611,7 @@ final class DiceView extends View implements SensorEventListener {
     private void drawRoundChip(Canvas c, float x, float y, float r, boolean on, boolean enabled,
                                String caption, String value, int a) {
         fill.setShader(null);
-        fill.setColor(withAlpha(on ? 0xFF2E2547 : 0xFF17121F, (int) (a * 0.95f)));
+        fill.setColor(withAlpha(on ? 0xFF2B1D33 : 0xFF14141B, (int) (a * 0.95f)));
         c.drawCircle(x, y, r, fill);
         line.setStrokeWidth(S * (on ? 0.006f : 0.0035f));
         line.setColor(withAlpha(on ? GOLD : GOLD_DIM, a));
@@ -652,8 +702,7 @@ final class DiceView extends View implements SensorEventListener {
         idleA = 0;
         rollA = 1;
         flightPlayed = wispPlayed = dingPlayed = verdictPlayed = false;
-        pNext = 0;
-        for (int i = 0; i < P_MAX; i++) pLife[i] = 0;
+        for (int i = 0; i < P_MAX; i++) if (pType[i] != PT_MOTE) pLife[i] = 0;
         for (int i = 0; i < animCount; i++) { anims[i].x = anims[i].px[0]; anims[i].y = anims[i].py[0]; }
         stepAnims(0);
         sfx.throwStart();
@@ -806,7 +855,7 @@ final class DiceView extends View implements SensorEventListener {
             revealT0 = now - DING_T;
             wispPlayed = dingPlayed = true;
             sfx.stopFlight();
-            for (int i = 0; i < P_MAX; i++) pLife[i] = 0;
+            for (int i = 0; i < P_MAX; i++) if (pType[i] != PT_MOTE) pLife[i] = 0;
         } else if (state == RESULT && now - revealT0 < VERDICT_T) {
             revealT0 = now - VERDICT_T;
             wispPlayed = dingPlayed = true;
@@ -823,7 +872,7 @@ final class DiceView extends View implements SensorEventListener {
         if (result.crit) {
             sfx.critSuccess();
             flashA = 1;
-            sparkBurst(main.x, main.y, 60, S * 1.1f, GOLD_HI);
+            sparkBurst(main.x, main.y, 60, S * 1.1f, CYAN_HI);
         } else if (result.fumble) {
             sfx.critFailure();
             shakeAt = now + 0.3f;
@@ -831,7 +880,7 @@ final class DiceView extends View implements SensorEventListener {
         } else if (result.dc > 0) {
             boolean ok = roller.passed(result);
             sfx.verdict(ok);
-            sparkBurst(cx, S * HEAD_NUM_Y - S * 0.03f, 16, S * 0.4f, ok ? GOLD_HI : RED);
+            sparkBurst(cx, S * HEAD_NUM_Y - S * 0.03f, 16, S * 0.4f, ok ? CYAN : RED);
         }
     }
 
@@ -853,10 +902,10 @@ final class DiceView extends View implements SensorEventListener {
             float mix = main && result.crit ? styleMix : 0;
             boolean fumbleFace = main && result.fumble && vt >= 0.18f;
 
-            int glowC = skin == 0 ? 0xFF8C80D8 : 0xFFB0303A;
+            int glowC = skin == 0 ? 0xFFD84AE0 : 0xFF8A3A9A;
             float glowA = 0.25f;
-            if (main && result.crit && vt >= 0) { glowC = 0xFFFFD27A; glowA = 0.45f + 0.15f * (float) Math.sin(now * 4); }
-            if (main && result.fumble && vt >= 0) { glowC = 0xFF8A0A12; glowA = 0.6f * Math.min(1, vt / 0.3f); }
+            if (main && result.crit && vt >= 0) { glowC = 0xFF7FFFF0; glowA = 0.45f + 0.15f * (float) Math.sin(now * 4); }
+            if (main && result.fumble && vt >= 0) { glowC = 0xFF7A0A3C; glowA = 0.6f * Math.min(1, vt / 0.3f); }
             drawGlow(c, an.x, an.y, sz * 1.9f, glowC, glowA * alpha);
 
             // motion-blur ghosts while flying fast
@@ -891,7 +940,7 @@ final class DiceView extends View implements SensorEventListener {
         float vt = rt - VERDICT_T;
         if (vt >= 0) {
             float m = Math.min(1, vt / 0.25f);
-            if (result.crit) col = mixColor(IVORY, GOLD_HI, m);
+            if (result.crit) col = mixColor(IVORY, CYAN_HI, m);
             else if (result.fumble) col = mixColor(IVORY, RED, m);
         }
         serif.setColor(withAlpha(0xFF000000, (int) (a * 150)));
@@ -902,12 +951,12 @@ final class DiceView extends View implements SensorEventListener {
         if (vt < 0) return;
         String v = null;
         int vc = GOLD;
-        if (result.crit) { v = "КРИТИЧЕСКИЙ УСПЕХ"; vc = GOLD_HI; }
+        if (result.crit) { v = "КРИТИЧЕСКИЙ УСПЕХ"; vc = CYAN_HI; }
         else if (result.fumble) { v = "КРИТИЧЕСКИЙ ПРОВАЛ"; vc = RED; }
         else if (result.dc > 0) {
             boolean ok = roller.passed(result);
             v = ok ? "УСПЕХ" : "ПРОВАЛ";
-            vc = ok ? GOLD_HI : RED;
+            vc = ok ? CYAN : RED;
         } else if (result.mode != Roller.MODE_NORMAL) {
             v = result.mode == Roller.MODE_ADV ? "ПРЕИМУЩЕСТВО" : "ПОМЕХА";
             vc = MUTED;
@@ -954,7 +1003,7 @@ final class DiceView extends View implements SensorEventListener {
         if (rt < WISP_T || rt > DING_T) return;
         float k = easeInOut(clamp01((rt - WISP_T) / WISP_D));
         wispPos(k, pv);
-        drawGlow(c, pv[0], pv[1], S * 0.06f, 0xFFFFD98A, 0.9f);
+        drawGlow(c, pv[0], pv[1], S * 0.06f, 0xFFFF7AE6, 0.9f);
         fill.setShader(null);
         fill.setColor(0xFFFFFFFF);
         c.drawCircle(pv[0], pv[1], S * 0.008f, fill);
@@ -994,7 +1043,7 @@ final class DiceView extends View implements SensorEventListener {
                 spawn(an.x + (rng.nextFloat() - 0.5f) * r, an.y + (rng.nextFloat() - 0.5f) * r,
                         (rng.nextFloat() - 0.5f) * S * 0.1f, (rng.nextFloat() - 0.5f) * S * 0.1f,
                         0.25f + rng.nextFloat() * 0.3f, S * (0.004f + rng.nextFloat() * 0.005f),
-                        rng.nextFloat() < 0.7f ? GOLD_HI : 0xFFFFFFFF, PT_GLOW, 3f, -S * 0.05f);
+                        HAZE[rng.nextInt(HAZE.length)], PT_GLOW, 3f, -S * 0.05f);
             }
         }
     }
@@ -1009,7 +1058,7 @@ final class DiceView extends View implements SensorEventListener {
             spawn(cx + (rng.nextFloat() - 0.5f) * S * 0.04f, y + (rng.nextFloat() - 0.5f) * S * 0.03f,
                     (rng.nextFloat() - 0.5f) * S * 0.2f, -S * (0.1f + rng.nextFloat() * 0.25f),
                     0.3f + rng.nextFloat() * 0.4f, S * (0.008f + rng.nextFloat() * 0.01f),
-                    rng.nextFloat() < 0.5f ? EMBER : 0xFFFFC14A, PT_GLOW, 2f, -S * 0.2f);
+                    rng.nextFloat() < 0.5f ? EMBER : 0xFFFF3B5C, PT_GLOW, 2f, -S * 0.2f);
         }
         if (k > 0.85f && rng.nextFloat() < 0.6f) sparkBurst(m.x, m.y, 6, S * 0.6f, EMBER);
     }
@@ -1027,8 +1076,20 @@ final class DiceView extends View implements SensorEventListener {
             spawn(m.x + (float) Math.cos(a) * r, m.y + (float) Math.sin(a) * r,
                     (float) Math.cos(a) * S * 0.05f, -S * (0.03f + rng.nextFloat() * 0.05f),
                     1.2f + rng.nextFloat() * 1.0f, S * (0.025f + rng.nextFloat() * 0.025f),
-                    rng.nextFloat() < 0.5f ? 0xFF4A0A0E : 0xFF1A0408, PT_SMOKE, 0.8f, 0);
+                    rng.nextFloat() < 0.5f ? 0xFF3A0E4A : 0xFF12061A, PT_SMOKE, 0.8f, 0);
         }
+    }
+
+    /** The Haze: multicoloured motes drifting lazily across the whole screen. */
+    private void emitHaze(float dt) {
+        float n = 7 * dt;
+        if (rng.nextFloat() > n) return;
+        double a = rng.nextDouble() * Math.PI * 2;
+        float r = (float) Math.sqrt(rng.nextFloat()) * S * 0.46f;
+        spawn(cx + (float) Math.cos(a) * r, cy + (float) Math.sin(a) * r,
+                (rng.nextFloat() - 0.5f) * S * 0.05f, -S * (0.01f + rng.nextFloat() * 0.03f),
+                3f + rng.nextFloat() * 3f, S * (0.004f + rng.nextFloat() * 0.006f),
+                HAZE[rng.nextInt(HAZE.length)], PT_MOTE, 0.05f, 0);
     }
 
     private void emitGoldMotes(float dt) {
@@ -1037,7 +1098,7 @@ final class DiceView extends View implements SensorEventListener {
         double a = rng.nextDouble() * Math.PI * 2;
         float r = m.sz * (0.7f + rng.nextFloat() * 0.5f);
         spawn(m.x + (float) Math.cos(a) * r, m.y + (float) Math.sin(a) * r, 0, -S * (0.04f + rng.nextFloat() * 0.06f),
-                0.9f + rng.nextFloat() * 0.7f, S * 0.006f, GOLD_HI, PT_GLOW, 0.5f, 0);
+                0.9f + rng.nextFloat() * 0.7f, S * 0.006f, rng.nextBoolean() ? CYAN_HI : GOLD_HI, PT_GLOW, 0.5f, 0);
     }
 
     /** smokePass: only smoke (drawn behind the dice); otherwise everything else (in front). */
@@ -1046,7 +1107,8 @@ final class DiceView extends View implements SensorEventListener {
         float a = state == IDLE ? rollA : 1;
         for (int i = 0; i < P_MAX; i++) {
             if (pLife[i] <= 0) continue;
-            if ((pType[i] == PT_SMOKE) != smokePass) continue;
+            boolean back = pType[i] == PT_SMOKE || pType[i] == PT_MOTE;
+            if (back != smokePass) continue;
             pLife[i] -= dt;
             float drag = (float) Math.exp(-dt * pDrag[i]);
             pVX[i] *= drag;
@@ -1066,6 +1128,14 @@ final class DiceView extends View implements SensorEventListener {
                     fill.setColor(withAlpha(pColor[i], (int) (255 * k * a)));
                     c.drawCircle(pX[i], pY[i], pSize[i] * 0.45f * (0.4f + k), fill);
                     break;
+                case PT_MOTE: {
+                    float fa = (float) Math.sin(Math.PI * k) * 0.55f;
+                    float tw = 0.7f + 0.3f * (float) Math.sin(now * 5 + i);
+                    drawGlow(c, pX[i], pY[i], pSize[i] * 3.2f, pColor[i], fa * tw);
+                    fill.setColor(withAlpha(pColor[i], (int) (255 * fa * tw)));
+                    c.drawCircle(pX[i], pY[i], pSize[i] * 0.4f, fill);
+                    break;
+                }
                 default: // smoke: grows and fades in-out
                     float grow = 1 + (1 - k) * 1.6f;
                     fill.setColor(withAlpha(pColor[i], (int) (75 * k * (1 - k) * 4 * a)));
@@ -1093,17 +1163,18 @@ final class DiceView extends View implements SensorEventListener {
             projY[i] = y - pv[1] * size * k;
         }
         int from = style == 2 ? roller.skin : style;
-        int br = mixC(BASE[from][0], BASE[style][0], mix), bgc = mixC(BASE[from][1], BASE[style][1], mix),
-                bb = mixC(BASE[from][2], BASE[style][2], mix);
         int er = mixC(EDGE[from][0], EDGE[style][0], mix), eg = mixC(EDGE[from][1], EDGE[style][1], mix),
                 eb = mixC(EDGE[from][2], EDGE[style][2], mix);
         int nr = mixC(NUM[from][0], NUM[style][0], mix), ng = mixC(NUM[from][1], NUM[style][1], mix),
                 nb = mixC(NUM[from][2], NUM[style][2], mix);
-        boolean pearl = from == 0 && (style != 2 || mix < 0.5f);
-        if (redFace >= 0) { br = br * 8 / 10; bgc = bgc * 7 / 10; bb = bb * 7 / 10; }
+        boolean crystalSkin = from == 0;
+        boolean darkNumbers = style == 2 && mix > 0.5f;
+        boolean corrupted = redFace >= 0;
+        if (corrupted) { er = 200; eg = 40; eb = 90; }
         int a = (int) (alpha * 255);
-        edge.setStrokeWidth(Math.max(1f, size * (pearl ? 0.02f : 0.03f)));
-        edge.setColor(Color.argb((int) (a * (pearl ? 0.8f : 1f)), er, eg, eb));
+        edge.setStrokeWidth(Math.max(1f, size * (crystalSkin ? 0.022f : 0.026f)));
+        edge.setColor(Color.argb((int) (a * 0.9f), er, eg, eb));
+        float shimmer = 12 * (float) Math.sin(now * 0.7f);
 
         for (int fi = 0; fi < p.faces.length; fi++) {
             Poly.Face f = p.faces[fi];
@@ -1112,12 +1183,24 @@ final class DiceView extends View implements SensorEventListener {
             float vis = CAM * pv[2] - (pv[0] * pv2[0] + pv[1] * pv2[1] + pv[2] * pv2[2]);
             if (vis <= 0) continue;
             float diff = Math.max(0, pv[0] * LIGHT[0] + pv[1] * LIGHT[1] + pv[2] * LIGHT[2]);
-            float spec = (float) Math.pow(Math.max(0, pv[0] * HALF[0] + pv[1] * HALF[1] + pv[2] * HALF[2]), pearl ? 18 : 28)
-                    * (pearl ? 0.5f : 0.6f);
-            float sh = pearl ? 0.2f + 0.88f * diff : 0.25f + 0.9f * diff;
-            float ir = pearl ? 14 * pv[0] : 0, ig = pearl ? 8 * pv[1] : 0, ib = pearl ? -14 * pv[0] + 10 : 0;
-            int r = clamp255(br * sh + 255 * spec + ir), g = clamp255(bgc * sh + 240 * spec + ig),
-                    b = clamp255(bb * sh + 230 * spec + ib);
+            float spec = (float) Math.pow(Math.max(0, pv[0] * HALF[0] + pv[1] * HALF[1] + pv[2] * HALF[2]),
+                    crystalSkin ? 22 : 30) * (crystalSkin ? 0.7f : 0.55f);
+            float sh = 0.22f + 0.85f * diff;
+            float fr, fg, fb;
+            if (crystalSkin) {
+                // iridescent delerium: the hue swings magenta → violet → teal with the facet angle
+                int ic = hsvToRgb(258 + 62 * pv[0] + 28 * pv[1] + shimmer, 0.6f, 0.3f + 0.62f * diff);
+                fr = (ic >> 16) & 255; fg = (ic >> 8) & 255; fb = ic & 255;
+            } else {
+                fr = BASE[from][0] * sh; fg = BASE[from][1] * sh; fb = BASE[from][2] * sh;
+            }
+            if (style == 2) {
+                fr = lerp(fr, BASE[2][0] * (0.45f + 0.6f * diff), mix);
+                fg = lerp(fg, BASE[2][1] * (0.45f + 0.6f * diff), mix);
+                fb = lerp(fb, BASE[2][2] * (0.45f + 0.6f * diff), mix);
+            }
+            if (corrupted) { fr *= 0.45f; fg *= 0.28f; fb *= 0.4f; }
+            int r = clamp255(fr + 255 * spec), g = clamp255(fg + 245 * spec), b = clamp255(fb + 255 * spec);
             face.setColor(Color.argb(a, r, g, b));
             poly.reset();
             for (int j = 0; j < f.idx.length; j++) {
@@ -1146,7 +1229,7 @@ final class DiceView extends View implements SensorEventListener {
             if (!homo.setPolyToPoly(src, 0, dst, 0, 4)) continue;
             labelPaths[kind][fi].transform(homo, tmpPath);
             boolean red = fi == redFace;
-            if (!pearl || red) {
+            if (!darkNumbers || red) {
                 // dark emboss under light numbers
                 label.setColor(Color.argb((int) (a * ta * 0.5f), 0, 0, 0));
                 tmpPath.offset(size * 0.008f, size * 0.012f);
@@ -1165,12 +1248,22 @@ final class DiceView extends View implements SensorEventListener {
         }
     }
 
+    /** Gradient shaders ignore the paint colour on Android, so each glow colour gets its own gradient. */
+    private final java.util.HashMap<Integer, RadialGradient> glowShaders = new java.util.HashMap<>();
+
     private void drawGlow(Canvas c, float x, float y, float r, int color, float alpha) {
         if (alpha <= 0.01f || r < 1) return;
+        int rgb = color & 0xFFFFFF;
+        RadialGradient g = glowShaders.get(rgb);
+        if (g == null) {
+            g = new RadialGradient(0, 0, 1, new int[]{0xFF000000 | rgb, 0x55000000 | rgb, rgb},
+                    new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
+            glowShaders.put(rgb, g);
+        }
         shaderM.setScale(r, r);
         shaderM.postTranslate(x, y);
-        glowShader.setLocalMatrix(shaderM);
-        glow.setColor(color);
+        g.setLocalMatrix(shaderM);
+        glow.setShader(g);
         glow.setAlpha((int) (Math.min(1, alpha) * 255));
         c.drawCircle(x, y, r, glow);
     }
@@ -1294,7 +1387,7 @@ final class DiceView extends View implements SensorEventListener {
         text.setLetterSpacing(0);
         settingRow(c, S * SET_SOUND, "Звук", roller.sound ? "ВКЛ" : "ВЫКЛ", roller.sound, a);
         settingRow(c, S * SET_SHAKE, "Встряхнуть — бросок", roller.shake ? "ВКЛ" : "ВЫКЛ", roller.shake, a);
-        settingRow(c, S * SET_SKIN, "Кубик", roller.skin == 0 ? "ПЕРЛАМУТР" : "РУБИН", true, a);
+        settingRow(c, S * SET_SKIN, "Кубик", roller.skin == 0 ? "ДЕЛИРИУМ" : "ОБСИДИАН", true, a);
         drawPill(c, cx, S * SET_DONE, S * 0.34f, S * 0.095f, true, "Готово", S * 0.045f, a);
     }
 
@@ -1576,6 +1669,17 @@ final class DiceView extends View implements SensorEventListener {
     }
 
     private static int mixC(int a, int b, float t) { return (int) (a + (b - a) * t); }
+
+    private static int hsvToRgb(float h, float s, float v) {
+        h = ((h % 360) + 360) % 360;
+        v = clamp01(v);
+        float c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+        float r, g, b;
+        if (h < 60) { r = c; g = x; b = 0; } else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; } else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; } else { r = c; g = 0; b = x; }
+        return 0xFF000000 | ((int) ((r + m) * 255) << 16) | ((int) ((g + m) * 255) << 8) | (int) ((b + m) * 255);
+    }
 
     private static int clamp255(float v) { return (int) Math.max(0, Math.min(255, v)); }
 
