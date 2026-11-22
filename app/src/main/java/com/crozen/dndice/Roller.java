@@ -23,6 +23,7 @@ final class Roller {
     int mode = MODE_NORMAL;
     int dc = 0;           // 0 = no DC
     boolean sound = true, shake = true;
+    int skin = 0;         // 0 pearl (as in BG3), 1 ruby
     final List<String> history = new ArrayList<>();
 
     /** One physical die on the table. For d100 a roll has two of them (tens + units). */
@@ -56,6 +57,7 @@ final class Roller {
         if (dc != 0) dc = clamp(dc, DC_MIN, DC_MAX);
         sound = prefs.getBoolean("sound", true);
         shake = prefs.getBoolean("shake", true);
+        skin = clamp(prefs.getInt("skin", 0), 0, 1);
         String h = prefs.getString("history", "");
         if (h != null && !h.isEmpty()) {
             for (String line : h.split("\n")) if (!line.isEmpty()) history.add(line);
@@ -200,6 +202,7 @@ final class Roller {
                 .putInt("dc", dc)
                 .putBoolean("sound", sound)
                 .putBoolean("shake", shake)
+                .putInt("skin", skin)
                 .putString("history", sb.toString())
                 .apply();
     }

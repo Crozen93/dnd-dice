@@ -22,13 +22,14 @@ import java.util.Random;
 final class Sfx {
 
     static final int SR = 44100;
-    private static final String VERSION = "sfx3";
+    private static final String VERSION = "sfx5";
 
     private final SoundPool pool;
     private final Vibrator vib;
     private final Random rng = new Random();
     private final int[] clack = new int[4];
-    private volatile int whoosh, land, success, failure, critWin, critFail, tick, select;
+    private volatile int whoosh, flight, land, wisp, ding, success, failure, critWin, critFail, tick, select;
+    private int flightStream;
     boolean soundOn = true;
 
     Sfx(Context ctx) {
@@ -51,10 +52,13 @@ final class Sfx {
         select = load(dir, "select", () -> tickSound(true));
         for (int i = 0; i < clack.length; i++) {
             final int k = i;
-            clack[i] = load(dir, "clack" + i, () -> clackSound(k));
+            clack[i] = load(dir, "clink" + i, () -> clinkSound(k));
         }
         whoosh = load(dir, "whoosh", Sfx::whooshSound);
+        flight = load(dir, "flight", Sfx::flightSound);
         land = load(dir, "land", Sfx::landSound);
+        wisp = load(dir, "wisp", Sfx::wispSound);
+        ding = load(dir, "ding", Sfx::dingSound);
         success = load(dir, "success", Sfx::successSound);
         failure = load(dir, "failure", Sfx::failureSound);
         critWin = load(dir, "critwin", Sfx::critWinSound);
@@ -64,19 +68,40 @@ final class Sfx {
     // ------------------------------------------------------------------ public API
 
     void throwStart() {
-        play(whoosh, 0.75f, 1f);
+        play(whoosh, 0.8f, 1f);
     }
 
-    /** One impact of a die on the table; strength 0..1. */
+    /** The die enters the panel: airy magical ringing while it flies. */
+    void flightStart() {
+        flightStream = play(flight, 0.6f, 0.96f + rng.nextFloat() * 0.08f);
+    }
+
+    void stopFlight() {
+        if (flightStream != 0) pool.stop(flightStream);
+        flightStream = 0;
+    }
+
+    /** The die hits a wall of the panel; strength 0..1. */
     void impact(float strength) {
         int id = clack[rng.nextInt(clack.length)];
-        play(id, 0.35f + 0.65f * strength, 0.9f + rng.nextFloat() * 0.22f);
-        buzz(8 + (int) (14 * strength), (int) (60 + 160 * strength));
+        play(id, 0.3f + 0.7f * strength, 0.92f + rng.nextFloat() * 0.18f);
+        buzz(6 + (int) (12 * strength), (int) (50 + 150 * strength));
     }
 
     void landed() {
-        play(land, 0.8f, 1f);
-        buzz(22, 150);
+        play(land, 1f, 1f);
+        buzz(30, 200);
+    }
+
+    /** Golden spark leaves the die. */
+    void wisp() {
+        play(wisp, 0.55f, 1f);
+    }
+
+    /** Spark reaches the DC / total. */
+    void ding() {
+        play(ding, 0.85f, 1f);
+        buzz(12, 120);
     }
 
     void verdict(boolean ok) {
@@ -96,7 +121,7 @@ final class Sfx {
 
     void critFailure() {
         play(critFail, 1f, 1f);
-        pattern(new long[]{0, 180, 90, 260}, new int[]{0, 255, 0, 200});
+        pattern(new long[]{0, 60, 160, 220, 90, 300}, new int[]{0, 120, 0, 255, 0, 200});
     }
 
     void tick() {
@@ -115,8 +140,9 @@ final class Sfx {
 
     // ------------------------------------------------------------------ playback
 
-    private void play(int id, float vol, float rate) {
-        if (soundOn && id != 0) pool.play(id, vol, vol, 1, 0, rate);
+    private int play(int id, float vol, float rate) {
+        if (soundOn && id != 0) return pool.play(id, vol, vol, 1, 0, rate);
+        return 0;
     }
 
     private void buzz(long ms, int amp) {
@@ -144,56 +170,108 @@ final class Sfx {
 
     // ------------------------------------------------------------------ sound design
 
-    /** A die hitting a wooden table: knock of the table, click of the corner, ring of the resin. */
-    static short[] clackSound(int variant) {
-        Random r = new Random(100 + variant);
-        float[] b = buf(0.16f);
-        float body = 150 + variant * 22;
-        partial(b, 0, 0.12f, body, 0.55f, 0.0008f, 0.028f);
-        partial(b, 0, 0.12f, body * 2.3f, 0.25f, 0.0008f, 0.018f);
-        float[] click = buf(0.05f);
-        noise(click, 0, 0.04f, 1f, 0.0002f, 0.004f, r);
-        bandpass(click, 2600 + variant * 450, 2.2f);
+    /** A crystal die striking the stone rim of the panel: a click and a glassy, inharmonic ring. */
+    static short[] clinkSound(int variant) {
+        Random r = new Random(200 + variant);
+        float[] b = buf(0.3f);
+        float f = 1900 + variant * 260;
+        partial(b, 0, 0.3f, f, 0.30f, 0.0004f, 0.075f);
+        partial(b, 0, 0.3f, f * 2.76f, 0.22f, 0.0004f, 0.045f);
+        partial(b, 0, 0.2f, f * 3.42f, 0.14f, 0.0004f, 0.03f);
+        partial(b, 0, 0.12f, 5600 + variant * 380, 0.18f, 0.0003f, 0.02f);
+        partial(b, 0, 0.15f, 120 + variant * 15, 0.25f, 0.001f, 0.02f);
+        float[] click = buf(0.03f);
+        noise(click, 0, 0.02f, 1f, 0.0001f, 0.0025f, r);
+        bandpass(click, 6200, 1.6f);
         mix(b, click, 0, 0.9f);
-        float res = 2300 + variant * 380;
-        partial(b, 0.001f, 0.08f, res, 0.18f, 0.0005f, 0.012f);
-        partial(b, 0.001f, 0.08f, res * 1.47f, 0.10f, 0.0005f, 0.009f);
-        lowpass(b, 9000);
-        return finish(b, 1.6f);
+        reverb(b, 0.18f, 0.7f);
+        return finish(b, 1f);
     }
 
-    /** Airy magical rush with glittering sparkles as the die leaves the hand. */
+    /** Throw: a bright sparkle and a quick airy rush as the die leaves. */
     static short[] whooshSound() {
         Random r = new Random(5);
-        float dur = 0.75f;
-        float[] b = buf(dur + 0.9f);
+        float dur = 0.45f;
+        float[] b = buf(dur + 0.8f);
         float[] air = buf(dur);
-        noise(air, 0, dur, 1f, 0.25f, 0.0f, r);
-        // swell then fade
+        noise(air, 0, dur, 1f, 0.06f, 0.0f, r);
         for (int i = 0; i < air.length; i++) {
             float k = i / (float) air.length;
-            air[i] *= (float) Math.sin(Math.PI * Math.pow(k, 0.7)) * 0.6f;
+            air[i] *= (float) Math.sin(Math.PI * Math.pow(k, 0.5)) * 0.7f;
         }
-        sweepLowpass(air, 500, 4200);
-        mix(b, air, 0, 0.55f);
-        for (int i = 0; i < 14; i++) {
-            float t = 0.05f + r.nextFloat() * 0.6f;
-            float f = 2600 + r.nextFloat() * 3400;
-            partial(b, t, 0.35f, f, 0.05f + r.nextFloat() * 0.05f, 0.002f, 0.07f);
-        }
-        reverb(b, 0.35f, 0.82f);
-        return finish(b, 1.4f);
+        sweepLowpass(air, 1200, 7000);
+        mix(b, air, 0, 0.6f);
+        partial(b, 0, 0.4f, 9700, 0.12f, 0.001f, 0.08f);
+        partial(b, 0.01f, 0.4f, 4380, 0.10f, 0.001f, 0.09f);
+        sparkles(b, 0.0f, 0.3f, 8, 0.05f, 3);
+        reverb(b, 0.35f, 0.8f);
+        return finish(b, 1f);
     }
 
-    /** The die comes to rest: soft thud and a resonant, slightly mysterious bell. */
+    /** While the die flies: shimmering 2–3 kHz ringing with tinkles, fading as it slows. */
+    static short[] flightSound() {
+        Random r = new Random(77);
+        float dur = 1.6f;
+        float[] b = buf(dur + 0.8f);
+        float[] air = buf(dur);
+        noise(air, 0, dur, 1f, 0.05f, 0.6f, r);
+        bandpass(air, 2600, 1.2f);
+        mix(b, air, 0, 0.25f);
+        float[] tones = {1957, 2016, 2320, 2965, 3023};
+        for (float f : tones) partial(b, 0.02f, dur, f, 0.05f, 0.12f, 0.55f);
+        for (int i = 0; i < 26; i++) {
+            float t = (float) Math.pow(r.nextFloat(), 1.3) * (dur - 0.2f);
+            float f = r.nextBoolean() ? 2000 + r.nextFloat() * 1100 : 5400 + r.nextFloat() * 1600;
+            partial(b, t, 0.25f, f, 0.035f + r.nextFloat() * 0.04f, 0.001f, 0.04f + r.nextFloat() * 0.05f);
+        }
+        reverb(b, 0.4f, 0.82f);
+        return finish(b, 0.8f);
+    }
+
+    /** The die comes to rest: deep thud with a low boom and a short glitter. */
     static short[] landSound() {
-        float[] b = buf(2.0f);
-        partial(b, 0, 0.25f, 95, 0.55f, 0.002f, 0.06f);
-        bell(b, 0.0f, 587.33f, 0.32f, 1.1f);              // D5
-        bell(b, 0.0f, 880f, 0.12f, 0.8f);                 // A5 fifth
-        pad(b, 0.0f, 1.2f, new float[]{293.66f, 440f}, 0.07f, 1800);
-        reverb(b, 0.4f, 0.85f);
-        return finish(b, 1.3f);
+        Random r = new Random(9);
+        float[] b = buf(1.4f);
+        boom(b, 0f, 0.5f, 85, 48, 0.9f);
+        partial(b, 0, 0.2f, 160, 0.35f, 0.001f, 0.04f);
+        float[] knock = buf(0.08f);
+        noise(knock, 0, 0.06f, 1f, 0.0002f, 0.012f, r);
+        bandpass(knock, 700, 1.0f);
+        mix(b, knock, 0, 0.7f);
+        partial(b, 0.0f, 0.4f, 5480, 0.05f, 0.001f, 0.06f);
+        sparkles(b, 0.02f, 0.25f, 7, 0.035f, 4);
+        reverb(b, 0.3f, 0.8f);
+        return finish(b, 1f);
+    }
+
+    /** A golden spark rising from the die: upward glittering sweep. */
+    static short[] wispSound() {
+        Random r = new Random(31);
+        float dur = 0.5f;
+        float[] b = buf(dur + 0.7f);
+        float[] air = buf(dur);
+        noise(air, 0, dur, 1f, 0.15f, 0f, r);
+        for (int i = 0; i < air.length; i++) air[i] *= (float) Math.sin(Math.PI * i / air.length) * 0.5f;
+        sweepLowpass(air, 3000, 12000);
+        mix(b, air, 0, 0.3f);
+        for (int i = 0; i < 12; i++) {
+            float t = i * dur / 12f;
+            partial(b, t, 0.2f, 3500 + i * 320 + r.nextFloat() * 200, 0.05f, 0.001f, 0.05f);
+        }
+        reverb(b, 0.4f, 0.8f);
+        return finish(b, 0.7f);
+    }
+
+    /** The spark hits the DC: a bright, slightly beating bell. */
+    static short[] dingSound() {
+        float[] b = buf(1.8f);
+        partial(b, 0, 1.6f, 1465, 0.35f, 0.001f, 0.6f);
+        partial(b, 0, 1.6f, 1559, 0.25f, 0.001f, 0.5f);
+        partial(b, 0, 1.0f, 2930, 0.12f, 0.001f, 0.25f);
+        partial(b, 0, 0.8f, 4395, 0.06f, 0.001f, 0.12f);
+        partial(b, 0, 1.2f, 733, 0.10f, 0.002f, 0.4f);
+        reverb(b, 0.4f, 0.84f);
+        return finish(b, 1f);
     }
 
     /** Beat the DC: bright rising bells over a warm major chord. */
@@ -218,41 +296,61 @@ final class Sfx {
         return finish(b, 1.4f);
     }
 
-    /** Natural 20: impact boom, heroic brass-and-choir swell, cascading bells, glitter tail. */
+    /** Rising broadband rush that ends in the hit at time end. */
+    static void riser(float[] b, float end, float len, float vol, int seed) {
+        Random r = new Random(seed);
+        float[] n = buf(len + 0.6f);
+        int hit = (int) (len * SR);
+        for (int i = 0; i < n.length; i++) {
+            float env = i < hit ? (float) Math.pow(i / (float) hit, 2.2) : (float) Math.exp(-(i - hit) / (0.18f * SR));
+            n[i] = (r.nextFloat() * 2 - 1) * env;
+        }
+        sweepLowpass(n, 600, 9000);
+        mix(b, n, (int) ((end - len) * SR), vol);
+    }
+
+    /** Natural 20: rush, impact, heroic brass-and-choir swell, cascading bells, glitter tail. */
     static short[] critWinSound() {
         Random r = new Random(20);
-        float[] b = buf(3.4f);
-        boom(b, 0f, 0.9f, 110, 38, 0.8f);
-        // brass/choir: detuned saws through an opening filter, C major → G/B → C
+        float[] b = buf(3.6f);
+        riser(b, 0.3f, 0.3f, 0.6f, 21);
+        boom(b, 0.3f, 0.9f, 110, 38, 0.8f);
         float[] brass = buf(2.2f);
         saws(brass, 0.0f, 1.0f, new float[]{261.63f, 329.63f, 392f, 523.25f}, 0.10f);
         saws(brass, 0.55f, 1.6f, new float[]{261.63f, 392f, 523.25f, 659.25f, 783.99f}, 0.10f);
         sweepLowpass(brass, 600, 3600);
-        mix(b, brass, (int) (0.05f * SR), 1f);
+        mix(b, brass, (int) (0.33f * SR), 1f);
+        pad(b, 0.35f, 2.4f, new float[]{261.63f, 329.63f, 392f, 523.25f}, 0.12f, 2400);
         float[] arp = {523.25f, 659.25f, 783.99f, 1046.5f, 1318.5f, 1567.98f, 2093f};
-        for (int i = 0; i < arp.length; i++) bell(b, 0.08f + i * 0.07f, arp[i], 0.16f, 1.2f);
-        sparkles(b, 0.3f, 1.8f, 26, 0.045f, r.nextInt());
+        for (int i = 0; i < arp.length; i++) bell(b, 0.38f + i * 0.07f, arp[i], 0.16f, 1.2f);
+        sparkles(b, 0.6f, 1.8f, 26, 0.045f, r.nextInt());
         reverb(b, 0.5f, 0.88f);
-        return finish(b, 1.25f);
+        return finish(b, 1f);
     }
 
-    /** Natural 1: heavy boom, a crack, and a sinking dissonant drone. */
+    /** Natural 1: roaring rush into a heavy hit and crackle, then a dark low drone (E–B–G). */
     static short[] critFailSound() {
         Random r = new Random(1);
-        float[] b = buf(3.0f);
-        boom(b, 0f, 1.1f, 90, 30, 0.9f);
-        float[] crack = buf(0.4f);
-        noise(crack, 0, 0.35f, 1f, 0.0005f, 0.05f, r);
-        bandpass(crack, 1400, 0.9f);
-        mix(b, crack, 0, 0.7f);
-        float[] drone = buf(2.4f);
-        // tritone that bends downward
-        bendSaws(drone, 0.05f, 2.0f, new float[]{110f, 155.56f, 116.54f}, 0.82f, 0.13f);
-        sweepLowpass(drone, 1600, 350);
-        mix(b, drone, 0, 1f);
-        bell(b, 0.05f, 233.08f, 0.18f, 1.2f);
+        float[] b = buf(4.4f);
+        riser(b, 0.35f, 0.35f, 0.9f, 2);
+        boom(b, 0.35f, 1.2f, 95, 30, 1f);
+        float[] crack = buf(0.6f);
+        noise(crack, 0, 0.5f, 1f, 0.0005f, 0.09f, r);
+        bandpass(crack, 1300, 0.7f);
+        mix(b, crack, (int) (0.35f * SR), 0.8f);
+        // fire crackle
+        for (int i = 0; i < 40; i++) {
+            float t = 0.4f + r.nextFloat() * 1.0f;
+            float[] c = buf(0.02f);
+            noise(c, 0, 0.015f, 1f, 0.0001f, 0.003f, r);
+            bandpass(c, 2500 + r.nextFloat() * 3000, 2f);
+            mix(b, c, (int) (t * SR), 0.25f * (1.4f - (t - 0.4f)));
+        }
+        // dark drone: E2, E3, B3, G3, E4 with slow swell
+        pad(b, 0.9f, 3.4f, new float[]{82.41f, 164.81f, 246.94f, 196f, 329.63f}, 0.35f, 700);
+        bendSaws(b, 0.5f, 1.4f, new float[]{164.81f, 233.08f}, 0.9f, 0.06f);
         reverb(b, 0.45f, 0.87f);
-        return finish(b, 1.4f);
+        return finish(b, 1f);
     }
 
     static short[] tickSound(boolean bright) {
