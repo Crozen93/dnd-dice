@@ -97,8 +97,8 @@ final class DiceView extends View implements SensorEventListener {
 
     // ------------------------------------------------------------------ particles
 
-    private static final int P_MAX = 260;
-    private static final int PT_STREAK = 0, PT_GLOW = 1, PT_SMOKE = 2, PT_MOTE = 3;
+    private static final int P_MAX = 420;
+    private static final int PT_STREAK = 0, PT_GLOW = 1, PT_SMOKE = 2, PT_MOTE = 3, PT_FOG = 4;
     private final float[] pX = new float[P_MAX], pY = new float[P_MAX], pVX = new float[P_MAX], pVY = new float[P_MAX],
             pLife = new float[P_MAX], pMax = new float[P_MAX], pSize = new float[P_MAX], pDrag = new float[P_MAX],
             pGrav = new float[P_MAX];
@@ -158,6 +158,9 @@ final class DiceView extends View implements SensorEventListener {
             IVORY = 0xFFEAE4D6, MUTED = 0xFF8E8A9C, RED = 0xFFFF3B5C, EMBER = 0xFFFF4FA0,
             IRON = 0xFF9AA2B0, IRON_HI = 0xFFD6DCE6, CYAN = 0xFF56F0DC, CYAN_HI = 0xFFB8FFF6, VIOLET = 0xFF8A4BFF;
     private static final int[] HAZE = {0xFFFF6AD5, 0xFFB46BFF, 0xFF56F0DC, 0xFFFFC46B, 0xFF7FA8FF};
+    /** Delerium smoke: glowing violets and magentas. */
+    private static final int[] FOG = {0xFFB23CC8, 0xFF7A3CFF, 0xFFE04ACB, 0xFF9A4BE8};
+    private static final int[] FOG_PURE = {0xFF56F0DC, 0xFF8FFFF0, 0xFF5AB8FF};
 
     // die styles: 0 delerium crystal (iridescent, base unused), 1 obsidian, 2 pure delerium (crit)
     private static final int[][] BASE = {{150, 60, 170}, {30, 26, 38}, {178, 252, 244}};
@@ -300,10 +303,11 @@ final class DiceView extends View implements SensorEventListener {
 
         drawFrame(c);
         drawArch(c);
+        drawGroundFog(c);
+        drawParticles(c, dt, true);
         drawHeader(c);
         if (idleA > 0.01f) drawIdle(c);
         if (state == ROLLING && fromIdle) drawVanish(c);
-        drawParticles(c, dt, true);
         if (rollA > 0.01f && animCount > 0) drawRoll(c);
         drawParticles(c, dt, false);
         if (state == RESULT) drawWisp(c);
@@ -340,6 +344,7 @@ final class DiceView extends View implements SensorEventListener {
         if (now >= shakeAt) redA *= (float) Math.exp(-dt * 2.2);
 
         emitHaze(dt);
+        if (state == IDLE) emitIdleSmoke(dt);
 
         if (historyOpen && !dragging) {
             histScroll += histVel * dt;
@@ -464,6 +469,23 @@ final class DiceView extends View implements SensorEventListener {
         poly.close();
         fill.setColor(0xFFFF8BEA);
         c.drawPath(poly, fill);
+        c.restore();
+    }
+
+    /** Delerium smoke pooled on the sill of the window, slowly churning (faster while rolling). */
+    private void drawGroundFog(Canvas c) {
+        c.save();
+        c.clipPath(archPath);
+        float sp = state == ROLLING ? 2.5f : 1f;
+        for (int i = 0; i < 7; i++) {
+            float ph = i * 1.7f;
+            float t = now * sp;
+            float x = cx + S * 0.27f * (float) Math.sin(t * 0.11f * (1 + i * 0.13f) + ph);
+            float y = S * (0.62f + 0.06f * (float) Math.sin(t * 0.17f + ph * 1.3f));
+            float r = S * (0.14f + 0.04f * (float) Math.sin(t * 0.23f + ph));
+            float a = 0.2f + 0.08f * (float) Math.sin(t * 0.4f + ph * 2);
+            drawGlow(c, x, y, r, FOG[i % FOG.length], a);
+        }
         c.restore();
     }
 
@@ -844,6 +866,7 @@ final class DiceView extends View implements SensorEventListener {
         for (int i = 0; i < animCount; i++) {
             Anim an = anims[i];
             sparkBurst(an.x, an.y, animCount > 3 ? 8 : 22, S * 0.55f, GOLD_HI);
+            fogRing(an.x, an.y + an.size * 0.3f, an.size, animCount > 3 ? 5 : 12, FOG);
         }
     }
 
@@ -873,10 +896,12 @@ final class DiceView extends View implements SensorEventListener {
             sfx.critSuccess();
             flashA = 1;
             sparkBurst(main.x, main.y, 60, S * 1.1f, CYAN_HI);
+            fogRing(main.x, main.y, main.size * 1.4f, 16, FOG_PURE);
         } else if (result.fumble) {
             sfx.critFailure();
             shakeAt = now + 0.3f;
             redA = 1;
+            fogRing(main.x, main.y, main.size * 1.2f, 10, new int[]{0xFF8A1A5A, 0xFF5A1A7A});
         } else if (result.dc > 0) {
             boolean ok = roller.passed(result);
             sfx.verdict(ok);
@@ -1037,6 +1062,11 @@ final class DiceView extends View implements SensorEventListener {
             if (tf < 0 || tf > FD - 0.2f) continue;
             if (animCount > 4 && (i & 1) == 1) continue;
             float g = Math.min(1, an.speed / (S * 1.5f));
+            if (animCount <= 4 || rng.nextFloat() < 0.4f) {
+                fog(an.x + (rng.nextFloat() - 0.5f) * an.sz * 0.5f, an.y + (rng.nextFloat() - 0.5f) * an.sz * 0.5f,
+                        (rng.nextFloat() - 0.5f) * S * 0.04f, (rng.nextFloat() - 0.5f) * S * 0.04f,
+                        0.7f + rng.nextFloat() * 0.5f, an.sz * (0.3f + 0.25f * g), FOG);
+            }
             int n = rng.nextFloat() < g ? 2 : 1;
             for (int k = 0; k < n; k++) {
                 float r = an.sz * 0.6f;
@@ -1080,6 +1110,30 @@ final class DiceView extends View implements SensorEventListener {
         }
     }
 
+    private void fog(float x, float y, float vx, float vy, float life, float size, int[] palette) {
+        spawn(x, y, vx, vy, life, size, palette[rng.nextInt(palette.length)], PT_FOG, 1.2f, -S * 0.02f);
+    }
+
+    /** Thin delerium smoke curling up off the resting crystal. */
+    private void emitIdleSmoke(float dt) {
+        if (idleA < 0.5f || rng.nextFloat() > 6 * dt) return;
+        float size = idleSize();
+        fog(cx + (rng.nextFloat() - 0.5f) * size * 0.8f, idleY() - size * 0.55f,
+                (rng.nextFloat() - 0.5f) * S * 0.04f, -S * (0.05f + rng.nextFloat() * 0.05f),
+                1.6f + rng.nextFloat(), S * (0.02f + rng.nextFloat() * 0.015f), FOG);
+    }
+
+    /** A puff ring bursting out from under a die as it lands. */
+    private void fogRing(float x, float y, float size, int n, int[] palette) {
+        for (int i = 0; i < n; i++) {
+            double a = i * Math.PI * 2 / n + rng.nextFloat() * 0.3;
+            float sp = S * (0.25f + rng.nextFloat() * 0.2f);
+            fog(x + (float) Math.cos(a) * size * 0.5f, y + (float) Math.sin(a) * size * 0.4f,
+                    (float) Math.cos(a) * sp, (float) Math.sin(a) * sp * 0.6f,
+                    1.1f + rng.nextFloat() * 0.6f, size * (0.28f + rng.nextFloat() * 0.12f), palette);
+        }
+    }
+
     /** The Haze: multicoloured motes drifting lazily across the whole screen. */
     private void emitHaze(float dt) {
         float n = 7 * dt;
@@ -1093,8 +1147,12 @@ final class DiceView extends View implements SensorEventListener {
     }
 
     private void emitGoldMotes(float dt) {
-        if (rng.nextFloat() > dt * 18) return;
         Anim m = mainAnim();
+        if (rng.nextFloat() < dt * 5) {
+            fog(m.x + (rng.nextFloat() - 0.5f) * m.sz, m.y - m.sz * 0.4f, (rng.nextFloat() - 0.5f) * S * 0.04f,
+                    -S * 0.06f, 1.8f, S * 0.03f, FOG_PURE);
+        }
+        if (rng.nextFloat() > dt * 18) return;
         double a = rng.nextDouble() * Math.PI * 2;
         float r = m.sz * (0.7f + rng.nextFloat() * 0.5f);
         spawn(m.x + (float) Math.cos(a) * r, m.y + (float) Math.sin(a) * r, 0, -S * (0.04f + rng.nextFloat() * 0.06f),
@@ -1107,7 +1165,7 @@ final class DiceView extends View implements SensorEventListener {
         float a = state == IDLE ? rollA : 1;
         for (int i = 0; i < P_MAX; i++) {
             if (pLife[i] <= 0) continue;
-            boolean back = pType[i] == PT_SMOKE || pType[i] == PT_MOTE;
+            boolean back = pType[i] == PT_SMOKE || pType[i] == PT_MOTE || pType[i] == PT_FOG;
             if (back != smokePass) continue;
             pLife[i] -= dt;
             float drag = (float) Math.exp(-dt * pDrag[i]);
@@ -1128,6 +1186,12 @@ final class DiceView extends View implements SensorEventListener {
                     fill.setColor(withAlpha(pColor[i], (int) (255 * k * a)));
                     c.drawCircle(pX[i], pY[i], pSize[i] * 0.45f * (0.4f + k), fill);
                     break;
+                case PT_FOG: {
+                    float age = 1 - k;
+                    float fa = 0.34f * (float) Math.pow(Math.sin(Math.PI * age), 0.8);
+                    drawGlow(c, pX[i], pY[i], pSize[i] * (1 + 1.8f * age), pColor[i], fa);
+                    break;
+                }
                 case PT_MOTE: {
                     float fa = (float) Math.sin(Math.PI * k) * 0.55f;
                     float tw = 0.7f + 0.3f * (float) Math.sin(now * 5 + i);
